@@ -15,11 +15,18 @@ import {
   TouchableOpacity,
   Animated,
 } from "react-native";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import axios from "axios";
 import styles from "../../stylesheets/add.styles";
 
 export default function AddOrchid() {
+  //______________Use States_______________
+  const [imageData, setImageData] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+  } | null>(null);
   const [image, setImage] = useState<string | null>(null);
   const [orchidName, setOrchidName] = useState("");
   const [price, setPrice] = useState("");
@@ -29,9 +36,10 @@ export default function AddOrchid() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const fadeAnim = useRef(new Animated.Value(0)).current;
-
   const scrollViewRef = useRef<ScrollView>(null);
+  //________________________________________
 
+  //_________Pick Image Function_________
   const pickImage = async () => {
     const permissionResult =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -49,9 +57,23 @@ export default function AddOrchid() {
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      const asset = result.assets[0];
+      setImage(asset.uri);
+
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [],
+        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      setImageData({
+        uri: manipulatedImage.uri,
+        name: asset.fileName || "upload.jpg",
+        type: "image/jpeg",
+      });
     }
   };
+  //_____________________________________
 
   const showStemsPickerIOS = () => {
     ActionSheetIOS.showActionSheetWithOptions(
@@ -117,7 +139,7 @@ export default function AddOrchid() {
   };
 
   const handleSubmit = async () => {
-    if (!orchidName || !price || !stock || !image) {
+    if (!orchidName || !price || !stock || !imageData) {
       alert("Please fill all fields and upload an image.");
       return;
     }
@@ -130,18 +152,11 @@ export default function AddOrchid() {
     formData.append("stock", stock);
     formData.append("stems", stems);
     formData.append("pot_size", potSize);
-
-    const imageUri = image;
-    let imageName = imageUri.split("/").pop() || "orchid.heic";
-
-    if (imageName.toLowerCase().endsWith(".heic")) {
-      imageName = imageName.replace(/\.heic$/i, ".jpg");
-    }
-
-    const response = await fetch(imageUri);
-    const blob = await response.blob();
-
-    formData.append("image", blob, imageName);
+    formData.append("image", {
+      uri: imageData.uri,
+      name: imageData.name,
+      type: imageData.type,
+    } as any);
 
     try {
       const response = await axios.post(
@@ -158,6 +173,7 @@ export default function AddOrchid() {
       if (response.data.message) {
         showSuccessMessage();
         setImage(null);
+        setImageData(null);
         setOrchidName("");
         setPrice("");
         setStock("");
