@@ -50,6 +50,7 @@ const db = mysql.createConnection({
   database: process.env.DB_NAME,
 });
 
+app.use("/images", express.static(path.join(__dirname, "images")));
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
